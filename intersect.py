@@ -255,7 +255,8 @@ def git_hash(directory):
         print("Error: {}".format(error))
     return output
 
-example = Example()
-example.run()
+while True:
+    example = Example()
+    example.run()
 
 sys.exit()
