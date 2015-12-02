@@ -6,7 +6,6 @@ import datetime
 import itertools
 import os
 import random
-import socket
 import subprocess
 import sys
 import mysql.connector as mdb
@@ -15,6 +14,9 @@ import mysql.connector as mdb
 # code, adapted to your needs:
 
 '''
+import random
+import socket
+
 class Settings:
     @staticmethod
     def get_parameters():
