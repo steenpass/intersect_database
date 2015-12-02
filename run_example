@@ -1,0 +1,141 @@
+/* input file format:
+ * 1st line:  an intvec opt with 8 elements:
+ *            opt[1]: use additional generators (trick) yes/no
+ *            opt[2]: use syz_ring yes/no
+ *            opt[3]: use syzComp yes/no
+ *            opt[4]: use redTail yes/no
+ *            opt[5]: use redThrough yes/no
+ *            opt[6]: characteristic
+ *            opt[7]: monomial ordering. 0: (c,dp)
+ *                                       1: (dp,c)
+ *                                       2: (dp,C)
+ *            opt[8]: precompute standard bases yes/no
+ * 2nd line:  ring variables
+ * 3rd line:  number of components/ideals to be intersected
+ * ...     :  the components/ideals to be intersected, one per line
+ * last line: the intersection of these ideals, or "" if the result is not
+ *            stored
+ *
+ * Make sure that the intersection is always provided if the script is called
+ * with non-default options.
+ * 
+ */
+
+/* read data from input file */
+execute("string input_file = "+system("--user-option")+";");
+string input = read(input_file);
+kill input_file;
+
+/* extract data needed for ring declaration */
+int position = 1;
+int length = find(input, newline, position)-position;
+execute("intvec opt = "+input[position, length]+";");
+int characteristic = opt[6];
+string ordering;
+if (opt[7] == 0) {
+    ordering = "(c,dp)";
+}
+if (opt[7] == 1) {
+    ordering = "(dp,c)";
+}
+if (opt[7] == 2) {
+    ordering = "(dp,C)";
+}
+if (ordering == "") {
+    ERROR("unknown monomial ordering");
+}
+position = position+length+1;
+length = find(input, newline, position)-position;
+execute("string variable_names = \""+input[position, length]+"\";");
+
+/* check that variable_names does not cause clashes */
+list identifiers = list("input", "position", "length", "opt", "characteristic",
+    "ordering", "variable_names", "ii", "R", "n_components", "components",
+    "intersection", "precompute_stds", "tmp", "rt", "use_trick", "JJ");
+int ii;
+for (ii = size(identifiers); ii > 0; ii--) {
+    if (find(variable_names, identifiers[ii])) {
+        ERROR("unreasonably named variables");
+    }
+}
+kill identifiers;
+
+/* declare ring */
+execute("ring R = "+string(characteristic)+", ("+variable_names+"), "+ordering
+    +";");
+
+/* extract ideals */
+position = position+length+1;
+length = find(input, newline, position)-position;
+execute("int n_components = "+input[position, length]+";");
+list components;
+for (ii = 1; ii <= n_components; ii++) {
+    position = position+length+1;
+    length = find(input, newline, position)-position;
+    execute("components[ii] = ideal("+input[position, length]+");");
+}
+position = position+length+1;
+length = find(input, newline, position)-position;
+if (length != 0) {
+    execute("ideal intersection = "+input[position, length]+";");
+}
+else {
+    ideal intersection;
+}
+
+/* pre-compute standard bases if this option is enabled */
+int precompute_stds = opt[8];
+option(noloadLib);
+LIB "modstd.lib";
+int tmp = setcores(1);
+system("--ticks-per-sec", 1000);
+int time_stds;
+if (char(basering) == 0) {
+    time_stds = rtimer;
+    if (precompute_stds) {
+        for (ii = size(components); ii > 0; ii--) {
+            components[ii] = modStd(components[ii]);
+        }
+        intersection = modStd(intersection);
+    }
+    time_stds = rtimer-time_stds;
+}
+else {
+    time_stds = rtimer;
+    if (precompute_stds) {
+        for (ii = size(components); ii > 0; ii--) {
+            components[ii] = std(components[ii]);
+        }
+        intersection = std(intersection);
+    }
+    time_stds = rtimer-time_stds;
+}
+
+/* call intersect() */
+int use_trick = opt[1];
+int time_intersect = rtimer;
+if (use_trick) {
+    ideal JJ = intersect(components[1..size(components)], intersection, opt);
+}
+else {
+    ideal JJ = intersect(components[1..size(components)], opt);
+}
+time_intersect = rtimer-time_intersect;
+
+/* print output */
+time_stds;
+time_intersect;
+ncols(JJ);   // n_generators
+if (!size(intersection)) {
+    string(JJ);
+}
+
+/* check results */
+if (size(intersection)) {
+    if (size(reduce(JJ, std(intersection), 1))
+            || size(reduce(intersection, std(JJ), 1))) {
+        ERROR("wrong result");
+    }
+}
+
+quit;

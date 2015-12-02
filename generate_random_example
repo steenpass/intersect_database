@@ -1,0 +1,50 @@
+LIB "random.lib";
+
+execute("intvec parameters = "+system("--user-option")+";");
+int n_variables          = parameters[1];
+int n_ideals             = parameters[2];
+int n_gens_from          = parameters[3];
+int n_gens_to            = parameters[4];
+int deg_from             = parameters[5];
+int deg_to               = parameters[6];
+int percent_entries_zero = parameters[7];
+int percent_terms_zero   = parameters[8];
+int bound_coeffs         = parameters[9];
+int max_size             = parameters[10];
+
+proc random_ideal(int n_gens_from, int n_gens_to, int deg_from, int deg_to,
+    int percent_entries_zero, int percent_terms_zero, int bound_coeffs,
+    int max_size)
+{
+    int n_gens = random(n_gens_from, n_gens_to);
+    ideal I = sparsematrix(1, n_gens, deg_to, deg_from, percent_entries_zero,
+            percent_terms_zero, bound_coeffs)
+        - sparsematrix(1, n_gens, deg_to, deg_from, percent_entries_zero,
+            percent_terms_zero, bound_coeffs);
+    int i;
+    for (i = ncols(I); i > 0; i--) {
+        if (size(I[i]) > max_size) {
+            I[i] = I[i][1..max_size];
+        }
+    }
+    I = simplify(I, 2);
+    return(I);
+}
+
+
+ring r = 0, x(1..n_variables), dp;
+
+list L;
+int i;
+for (i = n_ideals; i > 0; i--) {
+    L[i] = random_ideal(n_gens_from, n_gens_to, deg_from, deg_to,
+        percent_entries_zero, percent_terms_zero, bound_coeffs, max_size);
+}
+
+varstr(basering);
+n_ideals;
+for (i = 1; i <= n_ideals; i++) {
+    string(L[i]);
+}
+
+quit;
